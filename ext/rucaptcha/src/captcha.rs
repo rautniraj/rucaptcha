@@ -1,16 +1,17 @@
 use image::{ImageBuffer, Rgba};
+use imageproc::{
+    drawing::{draw_cubic_bezier_curve_mut, draw_filled_ellipse_mut},
+    noise::gaussian_noise_mut,
+};
 use rand::{thread_rng, Rng};
 use rusttype::{Font, Scale};
-use std::io::Cursor;
+use std::{io::Cursor, sync::LazyLock};
 
 static BASIC_CHAR: [char; 54] = [
     '2', '3', '4', '5', '6', '7', '8', '9', 'A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'J', 'K', 'M',
     'N', 'P', 'Q', 'R', 'S', 'T', 'U', 'V', 'W', 'X', 'Y', 'Z', 'a', 'b', 'c', 'd', 'e', 'f', 'g',
     'h', 'j', 'k', 'm', 'n', 'p', 'q', 'r', 's', 't', 'u', 'v', 'w', 'x', 'y', 'z',
 ];
-
-static FONT_BYTES1: &[u8; 145008] = include_bytes!("../fonts/FuzzyBubbles-Regular.ttf");
-static FONT_BYTES2: &[u8; 37792] = include_bytes!("../fonts/Handlee-Regular.ttf");
 
 // https://coolors.co/cc0b8f-7c0abe-5700c8-3c2ea4-3d56a8-3fa67e-45bb30-69d003-a0d003-d8db02
 static COLORS: [(u8, u8, u8, u8); 14] = [
@@ -33,32 +34,34 @@ static COLORS: [(u8, u8, u8, u8); 14] = [
 static SCALE_SM: u32 = 32;
 static SCALE_MD: u32 = 45;
 static SCALE_LG: u32 = 55;
+static FONT_0: LazyLock<Font> = LazyLock::new(|| {
+    Font::try_from_bytes(include_bytes!("../fonts/FuzzyBubbles-Regular.ttf")).unwrap()
+});
+static FONT_1: LazyLock<Font> =
+    LazyLock::new(|| Font::try_from_bytes(include_bytes!("../fonts/Handlee-Regular.ttf")).unwrap());
 
+#[inline(always)]
 fn rand_num(len: usize) -> usize {
     let mut rng = thread_rng();
     rng.gen_range(0..=len)
 }
 
-fn get_captcha(len: usize) -> Vec<String> {
-    let mut res = vec![];
+/// Generate a random captcha string with a given length
+#[inline]
+fn rand_captcha(len: usize) -> String {
+    let mut result = String::with_capacity(len);
+    let seed = BASIC_CHAR.len() - 1;
     for _ in 0..len {
-        let rnd = rand_num(53);
-        res.push(BASIC_CHAR[rnd].to_string())
+        let rnd = rand_num(seed);
+        result.push(BASIC_CHAR[rnd])
     }
-    res
+    result
 }
 
-#[allow(unused)]
-fn get_color() -> Rgba<u8> {
-    let rnd = rand_num(COLORS.len() - 1);
-    let c = COLORS[rnd];
-    Rgba([c.0, c.1, c.2, c.3])
-}
-
-fn get_colors(num: usize) -> Vec<Rgba<u8>> {
+fn get_colors(len: usize) -> Vec<Rgba<u8>> {
     let rnd = rand_num(COLORS.len());
-    let mut out = vec![];
-    for i in 0..num {
+    let mut out = Vec::with_capacity(len);
+    for i in 0..len {
         let c = COLORS[(rnd + i) % COLORS.len()];
         out.push(Rgba([c.0, c.1, c.2, c.3]))
     }
@@ -66,58 +69,48 @@ fn get_colors(num: usize) -> Vec<Rgba<u8>> {
     out
 }
 
+#[inline(always)]
 fn get_next(min: f32, max: u32) -> f32 {
     min + rand_num(max as usize - min as usize) as f32
 }
 
-fn get_font() -> Font<'static> {
-    match rand_num(2) {
-        0 => Font::try_from_bytes(FONT_BYTES1).unwrap(),
-        1 => Font::try_from_bytes(FONT_BYTES2).unwrap(),
-        _ => Font::try_from_bytes(FONT_BYTES1).unwrap(),
-    }
-}
-
-fn get_image(width: usize, height: usize) -> ImageBuffer<Rgba<u8>, Vec<u8>> {
-    ImageBuffer::from_fn(width as u32, height as u32, |_, _| {
-        image::Rgba([255, 255, 255, 255])
-    })
-}
-
-fn cyclic_write_character(res: &[String], image: &mut ImageBuffer<Rgba<u8>, Vec<u8>>, lines: bool) {
-    let c = (image.width() - 20) / res.len() as u32;
+fn cyclic_write_character(captcha: &str, image: &mut ImageBuffer<Rgba<u8>, Vec<u8>>, lines: bool) {
+    let c = (image.width() - 20) / captcha.len() as u32;
     let y = image.height() / 3 - 15;
 
     let h = image.height() as f32;
 
-    let scale = match res.len() {
+    let scale = match captcha.len() {
         1..=3 => SCALE_LG,
         4..=5 => SCALE_MD,
         _ => SCALE_SM,
     } as f32;
 
-    let colors = get_colors(res.len());
-    let line_colors = get_colors(res.len());
+    let colors = get_colors(captcha.len());
+    let line_colors = get_colors(captcha.len());
 
     let xscale = scale - rand_num((scale * 0.2) as usize) as f32;
-    let yscale = h as f32 - rand_num((h * 0.2) as usize) as f32;
+    let yscale = h - rand_num((h * 0.2) as usize) as f32;
 
     // Draw line, ellipse first as background
-    for (i, _) in res.iter().enumerate() {
+    (0..captcha.len()).for_each(|i| {
         let line_color = line_colors[i];
 
         if lines {
             draw_interference_line(1, image, line_color);
         }
         draw_interference_ellipse(1, image, line_color);
-    }
+    });
+
+    let font = match rand_num(2) {
+        0 => &FONT_0,
+        1 => &FONT_1,
+        _ => &FONT_1,
+    };
 
     // Draw text
-    for (i, _) in res.iter().enumerate() {
-        let text = &res[i];
-
+    for (i, ch) in captcha.chars().enumerate() {
         let color = colors[i];
-        let font = get_font();
 
         for j in 0..(rand_num(3) + 1) as i32 {
             // Draw text again with offset
@@ -126,13 +119,13 @@ fn cyclic_write_character(res: &[String], image: &mut ImageBuffer<Rgba<u8>, Vec<
                 image,
                 color,
                 10 + offset + (i as u32 * c) as i32,
-                y as i32 as i32,
+                y as i32,
                 Scale {
                     x: xscale + offset as f32,
                     y: yscale as f32,
                 },
-                &font,
-                text,
+                font,
+                &ch.to_string(),
             );
         }
     }
@@ -154,7 +147,7 @@ fn draw_interference_line(num: usize, image: &mut ImageBuffer<Rgba<u8>, Vec<u8>>
         let ctrl_x2 = get_next((width / 12) as f32, width / 12 * 3);
         let ctrl_y2 = get_next(x1, height - 5);
         // Randomly draw bezier curves
-        imageproc::drawing::draw_cubic_bezier_curve_mut(
+        draw_cubic_bezier_curve_mut(
             image,
             (x1, y1),
             (x2, y2),
@@ -176,7 +169,7 @@ fn draw_interference_ellipse(
         let x = rand_num((image.width() - 25) as usize) as i32;
         let y = rand_num((image.height() - 15) as usize) as i32;
 
-        imageproc::drawing::draw_filled_ellipse_mut(image, (x, y), w, w, color);
+        draw_filled_ellipse_mut(image, (x, y), w, w, color);
     }
 }
 
@@ -187,16 +180,16 @@ pub struct Captcha {
 
 pub struct CaptchaBuilder {
     length: usize,
-    width: usize,
-    height: usize,
+    width: u32,
+    height: u32,
     complexity: usize,
     line: bool,
     noise: bool,
     format: image::ImageFormat,
 }
 
-impl CaptchaBuilder {
-    pub fn new() -> Self {
+impl Default for CaptchaBuilder {
+    fn default() -> Self {
         CaptchaBuilder {
             length: 4,
             width: 220,
@@ -206,6 +199,12 @@ impl CaptchaBuilder {
             noise: false,
             format: image::ImageFormat::Png,
         }
+    }
+}
+
+impl CaptchaBuilder {
+    pub fn new() -> Self {
+        Self::default()
     }
 
     pub fn length(mut self, length: usize) -> Self {
@@ -235,32 +234,25 @@ impl CaptchaBuilder {
     }
 
     pub fn complexity(mut self, complexity: usize) -> Self {
-        let mut complexity = complexity;
-        if complexity > 10 {
-            complexity = 10;
-        }
-        if complexity < 1 {
-            complexity = 1;
-        }
-        self.complexity = complexity;
+        self.complexity = complexity.clamp(1, 10);
         self
     }
 
     pub fn build(self) -> Captcha {
         // Generate an array of captcha characters
-        let res = get_captcha(self.length);
-
-        let text = res.join("");
+        let text = rand_captcha(self.length);
 
         // Create a white background image
-        let mut image = get_image(self.width, self.height);
+        let mut buf = ImageBuffer::from_fn(self.width, self.height, |_, _| {
+            image::Rgba([255, 255, 255, 255])
+        });
 
         // Loop to write the verification code string into the background image
-        cyclic_write_character(&res, &mut image, self.line);
+        cyclic_write_character(&text, &mut buf, self.line);
 
         if self.noise {
-            imageproc::noise::gaussian_noise_mut(
-                &mut image,
+            gaussian_noise_mut(
+                &mut buf,
                 (self.complexity - 1) as f64,
                 ((10 * self.complexity) - 10) as f64,
                 ((5 * self.complexity) - 5) as u64,
@@ -268,9 +260,8 @@ impl CaptchaBuilder {
         }
 
         let mut bytes: Vec<u8> = Vec::new();
-        image
-            .write_to(&mut Cursor::new(&mut bytes), image::ImageFormat::Png)
-            .unwrap();
+        buf.write_to(&mut Cursor::new(&mut bytes), image::ImageFormat::Png)
+            .expect("failed to write rucaptcha image into png");
 
         Captcha { text, image: bytes }
     }
