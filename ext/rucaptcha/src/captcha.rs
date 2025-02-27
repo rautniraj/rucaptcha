@@ -7,25 +7,25 @@ use rand::{thread_rng, Rng};
 use rusttype::{Font, Scale};
 use std::{io::Cursor, sync::LazyLock};
 
-static BASIC_CHAR: [char; 8] = [
-    '2', '3', '4', '5', '6', '7', '8', '9',];
+static BASIC_CHAR: [char; 23] = [
+    '2', '3', '4', '5', '6', '7', '8', '9', 'A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L', 'M', 'N', 'O'];
 
 // https://coolors.co/cc0b8f-7c0abe-5700c8-3c2ea4-3d56a8-3fa67e-45bb30-69d003-a0d003-d8db02
 static COLORS: [(u8, u8, u8, u8); 14] = [
-    (197, 166, 3, 255),
-    (187, 87, 5, 255),
-    (176, 7, 7, 255),
-    (186, 9, 56, 255),
-    (204, 11, 143, 255),
-    (124, 10, 190, 255),
-    (87, 0, 200, 255),
-    (61, 86, 168, 255),
-    (63, 166, 126, 255),
-    (69, 187, 48, 255),
-    (105, 208, 3, 255),
-    (160, 208, 3, 255),
-    (216, 219, 2, 255),
-    (50, 50, 50, 255),
+    (197, 166, 3, 5),
+    (187, 87, 5, 10),
+    (176, 7, 7, 15),
+    (186, 9, 56, 20),
+    (204, 11, 143, 25),
+    (124, 10, 190, 30),
+    (87, 0, 200, 35),
+    (61, 86, 168, 40),
+    (63, 166, 126, 45),
+    (69, 187, 48, 50),
+    (105, 208, 3, 55),
+    (160, 208, 3, 60),
+    (216, 219, 2, 65),
+    (50, 50, 50, 70),
 ];
 
 static SCALE_SM: u32 = 32;
@@ -214,9 +214,9 @@ impl CaptchaBuilder {
                 let line_color = line_colors[i];
 
                 if lines {
-                    // draw_interference_line(1, image, line_color);
+                    draw_interference_line(1, image, line_color);
                 }
-                // draw_interference_ellipse(1, image, line_color);
+                draw_interference_ellipse(1, image, line_color);
             });
         }
 
