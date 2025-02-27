@@ -8,10 +8,7 @@ use rusttype::{Font, Scale};
 use std::{io::Cursor, sync::LazyLock};
 
 static BASIC_CHAR: [char; 54] = [
-    '2', '3', '4', '5', '6', '7', '8', '9', 'A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'J', 'K', 'M',
-    'N', 'P', 'Q', 'R', 'S', 'T', 'U', 'V', 'W', 'X', 'Y', 'Z', 'a', 'b', 'c', 'd', 'e', 'f', 'g',
-    'h', 'j', 'k', 'm', 'n', 'p', 'q', 'r', 's', 't', 'u', 'v', 'w', 'x', 'y', 'z',
-];
+    '2', '3', '4', '5', '6', '7', '8', '9',];
 
 // https://coolors.co/cc0b8f-7c0abe-5700c8-3c2ea4-3d56a8-3fa67e-45bb30-69d003-a0d003-d8db02
 static COLORS: [(u8, u8, u8, u8); 14] = [
