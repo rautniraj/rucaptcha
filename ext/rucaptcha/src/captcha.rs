@@ -217,9 +217,9 @@ impl CaptchaBuilder {
                 let line_color = line_colors[i];
 
                 if lines {
-                    draw_interference_line(1, image, line_color);
+                    // draw_interference_line(1, image, line_color);
                 }
-                draw_interference_ellipse(1, image, line_color);
+                // draw_interference_ellipse(1, image, line_color);
             });
         }
 
