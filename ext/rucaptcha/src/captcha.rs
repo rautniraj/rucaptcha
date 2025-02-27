@@ -7,7 +7,7 @@ use rand::{thread_rng, Rng};
 use rusttype::{Font, Scale};
 use std::{io::Cursor, sync::LazyLock};
 
-static BASIC_CHAR: [char; 54] = [
+static BASIC_CHAR: [char; 8] = [
     '2', '3', '4', '5', '6', '7', '8', '9',];
 
 // https://coolors.co/cc0b8f-7c0abe-5700c8-3c2ea4-3d56a8-3fa67e-45bb30-69d003-a0d003-d8db02
